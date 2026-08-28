@@ -1,0 +1,26 @@
+# Dataset (too large for GitHub)
+data/raw/train_images/
+data/raw/val_images/
+data/raw/test_images/
+
+# Model weights (too large for GitHub)
+*.pth
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
