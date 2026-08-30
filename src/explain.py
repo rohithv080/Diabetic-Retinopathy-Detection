@@ -2,6 +2,9 @@ import os
 import cv2
 import numpy as np
 import torch
+import argparse
+import random
+import glob
 import matplotlib.pyplot as plt
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image, preprocess_image
@@ -76,8 +79,23 @@ def main():
     targets = [ClassifierOutputTarget(1)]
 
     # 4. Process a sample image
-    # Note: Replace this with an actual image path from your dataset
-    sample_img_path = "../data/raw/train_images/1b329a127307.png" 
+    parser = argparse.ArgumentParser(description="Explain DR Detection Model")
+    parser.add_argument('--image', type=str, default="../data/raw/train_images/1b329a127307.png",
+                        help='Path to the image you want to test')
+    parser.add_argument('--random', action='store_true', help='Pick a random image from the validation set')
+    args = parser.parse_args()
+    
+    if args.random:
+        # Get a list of all images in the validation directory
+        all_images = glob.glob("../data/raw/val_images/*.png") + glob.glob("../data/raw/val_images/*.jpeg")
+        if len(all_images) > 0:
+            sample_img_path = random.choice(all_images)
+            print(f"🎲 Random mode activated! Selected image: {sample_img_path}")
+        else:
+            print("Could not find any images in ../data/raw/val_images/")
+            return
+    else:
+        sample_img_path = args.image 
     
     if not os.path.exists(sample_img_path):
         print(f"Sample image not found: {sample_img_path}. Please provide a valid path.")
@@ -85,6 +103,15 @@ def main():
 
     rgb_img, input_tensor = load_image(sample_img_path)
     input_tensor = input_tensor.to(device)
+
+    # 4.5 Get prediction
+    with torch.no_grad():
+        output = model(input_tensor)
+        pred_idx = torch.argmax(output, dim=1).item()
+        class_name = "DR (Diabetic Retinopathy)" if pred_idx == 1 else "No DR"
+        print(f"\n================================")
+        print(f"🩺 Predicted Class: {class_name}")
+        print(f"================================\n")
 
     # 5. Generate heatmap
     grayscale_cam = cam(input_tensor=input_tensor, targets=targets)
