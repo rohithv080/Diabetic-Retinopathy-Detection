@@ -37,12 +37,16 @@ class DRDataset(Dataset):
         # The paper uses binary classification: 0 (No DR) vs 1-4 (DR)
         binary_label = 0 if label == 0 else 1
         
-        # Load image (assuming .png extension, might need to adjust if they are .jpeg)
+        # Load image (supporting .png, .jpeg, and .jpg extensions)
         img_path = os.path.join(self.img_dir, f"{img_id}.png")
         if not os.path.exists(img_path):
-             img_path = os.path.join(self.img_dir, f"{img_id}.jpeg")
+            img_path = os.path.join(self.img_dir, f"{img_id}.jpeg")
+        if not os.path.exists(img_path):
+            img_path = os.path.join(self.img_dir, f"{img_id}.jpg")
                 
         image = cv2.imread(img_path)
+        if image is None:
+            raise FileNotFoundError(f"Could not load image at {img_path}")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
         # Resize all images to the same size (224x224 for Swin Transformer)
@@ -61,8 +65,9 @@ class DRDataset(Dataset):
             
         return image, torch.tensor(binary_label, dtype=torch.long)
 
-def get_dataloaders(csv_path, img_dir, transform=None, batch_size=32, num_workers=2):
+def get_dataloaders(csv_path, img_dir, transform=None, batch_size=32, num_workers=2, shuffle=True):
     df = pd.read_csv(csv_path)
     dataset = DRDataset(df, img_dir, transform=transform)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    pin_memory = torch.cuda.is_available()
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
     return dataloader

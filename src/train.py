@@ -24,14 +24,17 @@ def train(epochs=20, batch_size=32):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    model_save_path = os.path.join(os.path.dirname(__file__), "best_swin_model.pth")
+
     # 1. Setup DataLoaders
-    train_csv = "../data/raw/train_1.csv"
-    valid_csv = "../data/raw/valid.csv"
-    train_img_dir = "../data/raw/train_images/"
-    valid_img_dir = "../data/raw/val_images/"
+    train_csv = os.path.join(project_root, "data", "raw", "train_1.csv")
+    valid_csv = os.path.join(project_root, "data", "raw", "valid.csv")
+    train_img_dir = os.path.join(project_root, "data", "raw", "train_images")
+    valid_img_dir = os.path.join(project_root, "data", "raw", "val_images")
     
-    train_loader = get_dataloaders(train_csv, train_img_dir, batch_size=batch_size)
-    valid_loader = get_dataloaders(valid_csv, valid_img_dir, batch_size=batch_size)
+    train_loader = get_dataloaders(train_csv, train_img_dir, batch_size=batch_size, shuffle=True)
+    valid_loader = get_dataloaders(valid_csv, valid_img_dir, batch_size=batch_size, shuffle=False)
     
     # Calculate weights from training set
     df_train = pd.read_csv(train_csv)
@@ -43,7 +46,8 @@ def train(epochs=20, batch_size=32):
     
     optimizer = optim.AdamW(model.parameters(), lr=3e-4, weight_decay=0.05)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    scaler = GradScaler()
+    use_amp = (device.type == "cuda")
+    scaler = GradScaler(enabled=use_amp)
     
     # OneCycleLR Scheduler (warmup to max LR, then cool down)
     steps_per_epoch = len(train_loader)
@@ -68,8 +72,8 @@ def train(epochs=20, batch_size=32):
             
             optimizer.zero_grad()
             
-            # Mixed Precision
-            with autocast():
+            # Mixed Precision (enabled on CUDA)
+            with autocast(enabled=use_amp):
                 outputs = model(images)
                 loss = criterion(outputs, labels)
                 
@@ -96,7 +100,7 @@ def train(epochs=20, batch_size=32):
             for images, labels in tqdm(valid_loader, desc=f"Epoch {epoch+1}/{epochs} [Valid]"):
                 images, labels = images.to(device), labels.to(device)
                 
-                with autocast():
+                with autocast(enabled=use_amp):
                     outputs = model(images)
                     loss = criterion(outputs, labels)
                     
@@ -117,8 +121,8 @@ def train(epochs=20, batch_size=32):
         # Checkpointing
         if val_f1 > best_f1:
             best_f1 = val_f1
-            torch.save(model.state_dict(), "best_swin_model.pth")
-            print(f"--> Saved new best model with F1: {best_f1:.4f}")
+            torch.save(model.state_dict(), model_save_path)
+            print(f"--> Saved new best model to {model_save_path} with F1: {best_f1:.4f}")
 
 if __name__ == "__main__":
     train()

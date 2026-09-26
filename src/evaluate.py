@@ -17,19 +17,20 @@ def evaluate_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Evaluating on device: {device}")
 
-    # 1. Load Data
-    valid_csv = "../data/raw/valid.csv"
-    valid_img_dir = "../data/raw/val_images/"
+    # 1. Load Data with robust path resolution
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    valid_csv = os.path.join(project_root, "data", "raw", "valid.csv")
+    valid_img_dir = os.path.join(project_root, "data", "raw", "val_images")
     
     if not os.path.exists(valid_csv):
         print(f"Error: Could not find validation CSV at {valid_csv}")
         return
         
-    valid_loader = get_dataloaders(valid_csv, valid_img_dir, batch_size=32)
+    valid_loader = get_dataloaders(valid_csv, valid_img_dir, batch_size=32, shuffle=False)
 
     # 2. Load Model
     model = SwinDRModel(pretrained=False).to(device)
-    model_path = "best_swin_model.pth"
+    model_path = os.path.join(os.path.dirname(__file__), "best_swin_model.pth")
     
     if os.path.exists(model_path):
         model.load_state_dict(torch.load(model_path, map_location=device))
@@ -44,12 +45,14 @@ def evaluate_model():
     all_probs = []
     all_labels = []
 
+    use_amp = (device.type == "cuda")
+
     # 3. Get Predictions
     with torch.no_grad():
         for images, labels in tqdm(valid_loader, desc="Evaluating"):
             images = images.to(device)
             
-            with autocast():
+            with autocast(enabled=use_amp):
                 outputs = model(images)
                 probs = torch.softmax(outputs, dim=1)[:, 1] # Probability of Class 1 (DR)
                 preds = torch.argmax(outputs, dim=1)
@@ -69,7 +72,7 @@ def evaluate_model():
     mcc = matthews_corrcoef(all_labels, all_preds)
 
     print("\n" + "="*30)
-    print("🏆 FINAL EVALUATION METRICS 🏆")
+    print("FINAL EVALUATION METRICS")
     print("="*30)
     print(f"Accuracy:  {acc:.4f}")
     print(f"F1-Score:  {f1:.4f}")
@@ -81,6 +84,7 @@ def evaluate_model():
     print("="*30)
 
     # 5. Plot Confusion Matrix
+    cm_path = os.path.join(os.path.dirname(__file__), "confusion_matrix.png")
     cm = confusion_matrix(all_labels, all_preds)
     plt.figure(figsize=(6, 5))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
@@ -88,10 +92,11 @@ def evaluate_model():
     plt.title('Confusion Matrix - Swin Transformer')
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
-    plt.savefig("confusion_matrix.png", bbox_inches='tight')
+    plt.savefig(cm_path, bbox_inches='tight')
     plt.close()
 
     # 6. Plot ROC Curve
+    roc_path = os.path.join(os.path.dirname(__file__), "roc_curve.png")
     fpr, tpr, _ = roc_curve(all_labels, all_probs)
     plt.figure(figsize=(6, 5))
     plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {auc:.4f})')
@@ -102,10 +107,10 @@ def evaluate_model():
     plt.ylabel('True Positive Rate')
     plt.title('Receiver Operating Characteristic')
     plt.legend(loc="lower right")
-    plt.savefig("roc_curve.png", bbox_inches='tight')
+    plt.savefig(roc_path, bbox_inches='tight')
     plt.close()
 
-    print("\nVisualizations saved: 'confusion_matrix.png' and 'roc_curve.png'")
+    print(f"\nVisualizations saved: '{cm_path}' and '{roc_path}'")
 
 if __name__ == "__main__":
     evaluate_model()

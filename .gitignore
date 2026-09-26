@@ -24,3 +24,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Documents & raw notes
+*.docx
+extracted.txt

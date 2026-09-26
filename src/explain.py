@@ -24,17 +24,19 @@ def apply_clahe_rgb(image):
     return cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
 
 def load_image(img_path):
-    rgb_img = cv2.imread(img_path, 1)[:, :, ::-1]
+    rgb_img = cv2.imread(img_path, 1)
+    if rgb_img is None:
+        raise FileNotFoundError(f"Could not load image at {img_path}")
+    rgb_img = rgb_img[:, :, ::-1]
     rgb_img = cv2.resize(rgb_img, (224, 224))
-    rgb_img = np.float32(rgb_img) / 255
+    rgb_img = np.float32(rgb_img) / 255.0
     
     # Apply CLAHE
     rgb_img_clahe = apply_clahe_rgb(np.uint8(255 * rgb_img))
-    rgb_img_clahe = np.float32(rgb_img_clahe) / 255
+    rgb_img_clahe = np.float32(rgb_img_clahe) / 255.0
     
-    input_tensor = preprocess_image(rgb_img_clahe,
-                                    mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225])
+    # Match training preprocessing: [0, 1] scaled tensor without ImageNet z-normalization
+    input_tensor = torch.from_numpy(rgb_img_clahe.transpose((2, 0, 1))).unsqueeze(0).float()
     return rgb_img_clahe, input_tensor
 
 def swin_reshape_transform(x):
@@ -45,7 +47,6 @@ def swin_reshape_transform(x):
         return x.permute(0, 3, 1, 2)
     
     # Fallback just in case a different layer outputs a flattened (B, L, C) sequence
-    import numpy as np
     result = x.reshape(x.size(0),
                        int(np.sqrt(x.size(1))),
                        int(np.sqrt(x.size(1))),
@@ -56,9 +57,11 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
     # 1. Load the trained model
     model = SwinDRModel(pretrained=False).to(device)
-    model_path = "best_swin_model.pth"
+    model_path = os.path.join(os.path.dirname(__file__), "best_swin_model.pth")
     
     if os.path.exists(model_path):
         model.load_state_dict(torch.load(model_path, map_location=device))
@@ -79,20 +82,22 @@ def main():
     targets = [ClassifierOutputTarget(1)]
 
     # 4. Process a sample image
+    default_sample = os.path.join(project_root, "data", "raw", "train_images", "1b329a127307.png")
     parser = argparse.ArgumentParser(description="Explain DR Detection Model")
-    parser.add_argument('--image', type=str, default="../data/raw/train_images/1b329a127307.png",
+    parser.add_argument('--image', type=str, default=default_sample,
                         help='Path to the image you want to test')
     parser.add_argument('--random', action='store_true', help='Pick a random image from the validation set')
     args = parser.parse_args()
     
     if args.random:
         # Get a list of all images in the validation directory
-        all_images = glob.glob("../data/raw/val_images/*.png") + glob.glob("../data/raw/val_images/*.jpeg")
+        val_dir = os.path.join(project_root, "data", "raw", "val_images")
+        all_images = glob.glob(os.path.join(val_dir, "*.png")) + glob.glob(os.path.join(val_dir, "*.jpeg"))
         if len(all_images) > 0:
             sample_img_path = random.choice(all_images)
-            print(f"🎲 Random mode activated! Selected image: {sample_img_path}")
+            print(f"[Random Mode] Selected image: {sample_img_path}")
         else:
-            print("Could not find any images in ../data/raw/val_images/")
+            print(f"Could not find any images in {val_dir}")
             return
     else:
         sample_img_path = args.image 
@@ -110,7 +115,7 @@ def main():
         pred_idx = torch.argmax(output, dim=1).item()
         class_name = "DR (Diabetic Retinopathy)" if pred_idx == 1 else "No DR"
         print(f"\n================================")
-        print(f"🩺 Predicted Class: {class_name}")
+        print(f"Predicted Class: {class_name}")
         print(f"================================\n")
 
     # 5. Generate heatmap
@@ -132,7 +137,7 @@ def main():
     plt.imshow(visualization)
     plt.axis('off')
     
-    output_path = "gradcam_result.png"
+    output_path = os.path.join(os.path.dirname(__file__), "gradcam_result.png")
     plt.savefig(output_path, bbox_inches='tight')
     print(f"Successfully saved heatmap to {output_path}")
 
