@@ -1,0 +1,11 @@
+# Ignore binary files, dataset, and model checkpoints
+*.pth
+data/
+*.png
+*.jpg
+*.jpeg
+*.docx
+extracted.txt
+
+# Keep Python files untouched by Prettier
+*.py
