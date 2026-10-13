@@ -79,16 +79,23 @@ def load_dr_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = SwinDRModel(model_name='swin_base_patch4_window7_224', num_classes=2, pretrained=False)
     
-    # Auto-download weights if URL provided in cloud environment
-    if not os.path.exists(MODEL_PATH) and os.environ.get("MODEL_WEIGHTS_URL"):
-        url = os.environ.get("MODEL_WEIGHTS_URL")
+    # Auto-download weights if URL provided in cloud environment or default GitHub Release
+    if not os.path.exists(MODEL_PATH):
+        url = os.environ.get(
+            "MODEL_WEIGHTS_URL",
+            "https://github.com/rohithv080/Diabetic-Retinopathy-Detection/releases/download/v1.0/best_swin_model.pth"
+        )
         try:
-            with st.spinner("Downloading model weights from cloud storage..."):
-                import urllib.request
-                os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+            import urllib.request
+            os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+            with st.spinner("Downloading trained Swin Transformer weights (~340 MB)... this may take a moment on first run."):
                 urllib.request.urlretrieve(url, MODEL_PATH)
-        except Exception as e:
-            st.error(f"Failed to download weights from MODEL_WEIGHTS_URL: {e}")
+        except Exception:
+            if os.path.exists(MODEL_PATH):
+                try:
+                    os.remove(MODEL_PATH)
+                except Exception:
+                    pass
 
     if os.path.exists(MODEL_PATH):
         try:
