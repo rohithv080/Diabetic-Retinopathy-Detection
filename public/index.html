@@ -3,264 +3,193 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Diabetic Retinopathy Detection & Grad-CAM Screening Portal</title>
-  <meta name="description" content="Automated binary screening platform for Diabetic Retinopathy powered by Swin Transformer and Grad-CAM explainability." />
+  <title>Diabetic Retinopathy Detection & Grad-CAM Analysis</title>
+  <meta name="description" content="Diabetic Retinopathy Detection & Grad-CAM Analysis" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=2.0" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <!-- Top Navigation Bar -->
-  <header class="navbar">
-    <div class="nav-container">
-      <div class="brand">
-        <div class="brand-icon"><i class="fa-solid fa-eye"></i></div>
-        <div class="brand-text">
-          <h1>DR Screen AI</h1>
-          <span class="badge">Swin Transformer &bull; Grad-CAM</span>
-        </div>
-      </div>
-      <div class="nav-status">
-        <div class="status-indicator">
-          <span class="status-dot"></span>
-          <span class="status-text">Model Loaded (Acc 92.9% &bull; F1 0.92)</span>
-        </div>
-        <a href="#benchmarks" class="nav-link"><i class="fa-solid fa-chart-line"></i> Jury Metrics</a>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Container -->
-  <main class="main-container">
-    <!-- Top Action Grid -->
-    <div class="app-layout">
-      
-      <!-- Left Column: Controls & Diagnostic Outcome -->
-      <aside class="sidebar-panel">
+  <div class="stApp">
+    
+    <!-- Streamlit Sidebar -->
+    <aside class="stSidebar">
+      <div class="stSidebarContent">
+        <h2 class="sidebar-heading">Instructions & About</h2>
         
-        <!-- Sample Selector Card -->
-        <div class="card">
-          <div class="card-header">
-            <h2><i class="fa-solid fa-flask-vial"></i> Evaluation Samples</h2>
-            <span class="pill">Binary Triage</span>
-          </div>
-          <div class="card-body">
-            <p class="section-desc">Select a validated clinical retinal fundus sample:</p>
-            <div class="sample-buttons">
-              <button id="btn-sample-healthy" class="sample-btn active" onclick="selectSample('healthy')">
-                <span class="dot green"></span>
-                <span class="sample-title">🟢 Healthy Retina</span>
-                <span class="sample-sub">No-DR Baseline</span>
-              </button>
-              <button id="btn-sample-dr" class="sample-btn" onclick="selectSample('dr')">
-                <span class="dot red"></span>
-                <span class="sample-title">🔴 Diabetic Retinopathy</span>
-                <span class="sample-sub">DR Lesions Present</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Custom Upload Card -->
-        <div class="card upload-card">
-          <div class="card-header">
-            <h2><i class="fa-solid fa-cloud-arrow-up"></i> Upload Fundus Image</h2>
-          </div>
-          <div class="card-body">
-            <div class="dropzone" id="dropzone">
-              <i class="fa-solid fa-image-polaroid drop-icon"></i>
-              <p>Drag & drop fundus image or <strong>browse</strong></p>
-              <span class="upload-types">Supports PNG, JPG, JPEG (Max 15 MB)</span>
-              <input type="file" id="file-input" accept="image/*" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Diagnostic Outcome Card -->
-        <div class="card result-card" id="result-card">
-          <div class="card-header">
-            <h2><i class="fa-solid fa-stethoscope"></i> Screening Diagnosis</h2>
-            <span class="timestamp" id="report-timestamp">Generated just now</span>
-          </div>
-          <div class="card-body">
-            <!-- Outcome Banner -->
-            <div class="outcome-banner healthy" id="outcome-banner">
-              <div class="banner-icon" id="banner-icon"><i class="fa-solid fa-shield-check"></i></div>
-              <div class="banner-content">
-                <h3 id="outcome-title">No Diabetic Retinopathy Detected</h3>
-                <p id="outcome-action">Low Risk &bull; Routine annual screening recommended</p>
-              </div>
-            </div>
-
-            <!-- Probability Metrics -->
-            <div class="metrics-grid">
-              <div class="metric-box">
-                <span class="metric-label">Confidence Score</span>
-                <span class="metric-val highlight" id="metric-confidence">99.97%</span>
-              </div>
-              <div class="metric-box">
-                <span class="metric-label">Clinical Risk Tier</span>
-                <span class="metric-val" id="metric-risk">Low Risk</span>
-              </div>
-            </div>
-
-            <!-- Probability Bars -->
-            <div class="prob-breakdown">
-              <div class="prob-item">
-                <div class="prob-info">
-                  <span>Healthy (No DR)</span>
-                  <strong id="val-healthy">99.97%</strong>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill green" id="bar-healthy" style="width: 99.97%;"></div>
-                </div>
-              </div>
-              <div class="prob-item">
-                <div class="prob-info">
-                  <span>Diabetic Retinopathy (DR)</span>
-                  <strong id="val-dr">0.03%</strong>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill red" id="bar-dr" style="width: 0.03%;"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Primary PDF Download Action -->
-            <div class="download-container">
-              <button class="btn-download" id="btn-download-pdf" onclick="generatePDFReport()">
-                <i class="fa-solid fa-file-pdf"></i>
-                <span>Download Patient Screening PDF Report</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </aside>
-
-      <!-- Right Column: High-Res Fundus & Grad-CAM Visualizer -->
-      <section class="content-panel">
-        
-        <!-- Visualizer Card -->
-        <div class="card viewer-card">
-          <div class="card-header">
-            <h2><i class="fa-solid fa-microscope"></i> Clinical Tri-Panel & Grad-CAM Analysis</h2>
-            <div class="viewer-meta">
-              <span class="chip"><i class="fa-solid fa-layer-group"></i> CIE LAB CLAHE</span>
-              <span class="chip"><i class="fa-solid fa-bullseye"></i> norm1 Layer Attention</span>
-            </div>
-          </div>
+        <div class="sidebar-text">
+          <p><strong>Diabetic Retinopathy Screening</strong></p>
+          <p>Automated binary screening system to detect microvascular signs of Diabetic Retinopathy (DR) in retinal fundus photographs with visual Grad-CAM explainability.</p>
           
-          <div class="card-body">
-            <!-- Tri-Panel Images -->
-            <div class="tri-panel-grid">
-              
-              <!-- Panel 1: Original Fundus -->
-              <div class="image-panel">
-                <div class="panel-label"><i class="fa-regular fa-image"></i> 1. Original Fundus Retina</div>
-                <div class="image-wrapper">
-                  <img id="img-original" src="samples/healthy_original.png" alt="Original Fundus Retina" />
-                </div>
-              </div>
+          <hr class="stDivider" />
+          
+          <h3>📋 Screening Steps</h3>
+          <ol>
+            <li><strong>Input:</strong> Select an image source (Upload a photo or choose a benchmark sample).</li>
+            <li><strong>Contrast Enhancement:</strong> Automated CLAHE enhancement normalizes illumination and highlights vascular microaneurysms and exudates.</li>
+            <li><strong>Analysis:</strong> Inspect the binary detection outcome banner, risk level, interactive probability breakdown, and lesion attention heatmap.</li>
+            <li><strong>Report Export:</strong> Download the official single-page clinical PDF report for documentation and triage records.</li>
+          </ol>
+          
+          <hr class="stDivider" />
+          
+          <h3>🩺 Clinical Note</h3>
+          <p>This tool serves as an automated preliminary triage aid. Definitive diagnostic decisions should be validated by an eye care specialist through dilated fundus examination.</p>
+        </div>
+      </div>
+    </aside>
 
-              <!-- Panel 2: Enhanced Preprocessed -->
-              <div class="image-panel">
-                <div class="panel-label"><i class="fa-solid fa-wand-magic-sparkles"></i> 2. CLAHE Contrast Enhanced</div>
-                <div class="image-wrapper">
-                  <img id="img-enhanced" src="samples/healthy_enhanced.png" alt="Enhanced Fundus Retina" />
-                </div>
-              </div>
-
-              <!-- Panel 3: Grad-CAM Overlay with Opacity -->
-              <div class="image-panel">
-                <div class="panel-label"><i class="fa-solid fa-fire"></i> 3. Grad-CAM Attention Heatmap</div>
-                <div class="image-wrapper canvas-container">
-                  <canvas id="blend-canvas" width="448" height="448"></canvas>
-                </div>
-              </div>
-
-            </div>
-
-            <!-- Heatmap Opacity Slider Controls -->
-            <div class="slider-controls">
-              <div class="slider-header">
-                <label for="opacity-slider"><i class="fa-solid fa-sliders"></i> Interactive Heatmap Overlay Intensity:</label>
-                <span class="slider-val" id="opacity-val">55%</span>
-              </div>
-              <input type="range" id="opacity-slider" min="0" max="100" value="55" oninput="updateBlendOpacity(this.value)" />
-              <div class="slider-legend">
-                <span>0% (Base Retina)</span>
-                <span>50% (Balanced Blend)</span>
-                <span>100% (Pure Attention Map)</span>
-              </div>
-            </div>
-
-            <!-- Clinical Explanation Box -->
-            <div class="findings-box" id="findings-box">
-              <h4><i class="fa-solid fa-file-medical"></i> Automated Clinical Summary</h4>
-              <p id="findings-text">
-                Swin Transformer shifted-window self-attention detected standard vascular architecture without focal high-attention pathology. Optic disc and macula regions demonstrate uniform feature activation consistent with non-referable healthy retinal physiology.
-              </p>
-            </div>
-
+    <!-- Streamlit Main Content Container -->
+    <main class="stMain">
+      <div class="stBlockContainer">
+        
+        <!-- Header -->
+        <h1 class="main-title">🩺 Diabetic Retinopathy Detection & Grad-CAM Analysis</h1>
+        <div class="main-subtitle">Upload a digital retinal fundus photograph to detect diabetic retinopathy, inspect lesion attention heatmaps, and generate a clinical PDF report.</div>
+        
+        <!-- Input Method Radio -->
+        <div class="stRadioGroup">
+          <label class="stControlLabel">Choose Input Method:</label>
+          <div class="stRadioOptions">
+            <label class="stRadioOption">
+              <input type="radio" name="input_mode" value="sample" checked onchange="handleInputModeChange(this.value)" />
+              <span class="stRadioCustom"></span>
+              <span class="stRadioText">🖼️ Try Benchmark Demo Samples</span>
+            </label>
+            <label class="stRadioOption">
+              <input type="radio" name="input_mode" value="upload" onchange="handleInputModeChange(this.value)" />
+              <span class="stRadioCustom"></span>
+              <span class="stRadioText">📤 Upload Fundus Photograph</span>
+            </label>
           </div>
         </div>
 
-        <!-- Technical Benchmarks Card (For Jury) -->
-        <div class="card benchmarks-card" id="benchmarks">
-          <div class="card-header">
-            <h2><i class="fa-solid fa-award"></i> Technical Architecture & Benchmark Metrics (Jury Reference)</h2>
-            <span class="pill blue">Validation Results</span>
+        <!-- Sample Selector (Visible when 'sample' selected) -->
+        <div id="section-sample-select" class="stSelectGroup">
+          <label class="stControlLabel" for="sample-dropdown">Select a benchmark sample fundus photograph:</label>
+          <div class="stSelectWrapper">
+            <select id="sample-dropdown" class="stSelect" onchange="handleSampleSelect(this.value)">
+              <option value="healthy" selected>🟢 Healthy Retina (No-DR)</option>
+              <option value="dr">🔴 Diabetic Retinopathy (DR Detected)</option>
+            </select>
+            <span class="stSelectArrow">▼</span>
           </div>
-          <div class="card-body">
-            <div class="specs-grid">
-              <div class="spec-item">
-                <span class="spec-label">Model Backbone</span>
-                <strong>swin_base_patch4_window7_224</strong>
-                <span class="spec-desc">Hierarchical Shifted-Window Vision Transformer</span>
-              </div>
-              <div class="spec-item">
-                <span class="spec-label">Validation Accuracy</span>
-                <strong class="highlight-green">92.9%</strong>
-                <span class="spec-desc">Binary DR triage benchmark</span>
-              </div>
-              <div class="spec-item">
-                <span class="spec-label">Macro F1-Score</span>
-                <strong class="highlight-blue">0.92</strong>
-                <span class="spec-desc">Balanced sensitivity & specificity</span>
-              </div>
-              <div class="spec-item">
-                <span class="spec-label">Preprocessing Pipeline</span>
-                <strong>CIE LAB CLAHE (L-Channel)</strong>
-                <span class="spec-desc">Preserves retinal color tones, clips contrast at 2.0</span>
-              </div>
-            </div>
+        </div>
 
-            <div class="jury-notes">
-              <h4><i class="fa-solid fa-circle-info"></i> Academic Note for Evaluators</h4>
-              <p>
-                Unlike standard convolutional neural networks with static local receptive fields, the Swin Transformer uses shifted local windows (W-MSA & SW-MSA) to capture both microaneurysms and global macula context. Visual interpretability is derived via Grad-CAM targeted at the final normalization layer (<code>layers[-1].blocks[-1].norm1</code>).
-              </p>
+        <!-- File Uploader (Visible when 'upload' selected) -->
+        <div id="section-file-upload" class="stFileUploaderGroup" style="display: none;">
+          <label class="stControlLabel">Upload Retinal Fundus Photograph (JPG, PNG, TIFF)</label>
+          <div class="stDropzone" id="dropzone">
+            <div class="stDropzoneIcon">📁</div>
+            <div class="stDropzoneText">
+              <strong>Drag and drop file here</strong>
+              <span>Limit 200MB per file &bull; JPG, PNG, TIF</span>
+            </div>
+            <button type="button" class="stBrowseBtn" onclick="document.getElementById('file-input').click()">Browse files</button>
+            <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileUpload(event)" />
+          </div>
+        </div>
+
+        <hr class="stDivider" />
+
+        <!-- Visual Analysis & Grad-CAM Heatmap -->
+        <h3 class="stSubheader">Visual Analysis & Grad-CAM Heatmap</h3>
+        
+        <div class="stImageColumns">
+          <div class="stImageCol">
+            <div class="image-card-title">1. Original Fundus Photograph</div>
+            <div class="stImgBox">
+              <img id="img-original" src="samples/healthy_original.png" alt="Original Fundus Photograph" />
+            </div>
+          </div>
+          <div class="stImageCol">
+            <div class="image-card-title">2. CLAHE Contrast Enhanced</div>
+            <div class="stImgBox">
+              <img id="img-enhanced" src="samples/healthy_enhanced.png" alt="CLAHE Contrast Enhanced" />
+            </div>
+          </div>
+          <div class="stImageCol">
+            <div class="image-card-title">3. Grad-CAM Lesion Attention</div>
+            <div class="stImgBox canvas-box">
+              <canvas id="blend-canvas" width="448" height="448"></canvas>
             </div>
           </div>
         </div>
 
-      </section>
+        <hr class="stDivider" />
 
-    </div>
-  </main>
+        <!-- Binary Outcome Alert Banner (Dynamic) -->
+        <div id="outcome-banner-container">
+          <!-- Populated by JS to match app.py exactly -->
+        </div>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="footer-container">
-      <p>&copy; Automated Diabetic Retinopathy Screening System. Built with PyTorch, Swin Transformer & Grad-CAM.</p>
-      <p class="disclaimer">Disclaimer: Clinical AI decision-support screening aid. Not a replacement for professional ophthalmological examination.</p>
-    </div>
-  </footer>
+        <!-- Download Button -->
+        <div class="stDownloadButtonContainer">
+          <button id="btn-download-pdf" class="stDownloadButton" onclick="generatePatientPDF()">
+            📄 Download Patient Screening PDF Report
+          </button>
+        </div>
 
-  <script src="js/app.js"></script>
+        <!-- Probability Breakdown & Guidance Cards -->
+        <div class="stResultsColumns">
+          
+          <!-- Left: Probability Distribution -->
+          <div class="stResultsCol">
+            <h3 class="stSubheader">Probability Distribution</h3>
+            
+            <!-- Donut Chart Box -->
+            <div class="donut-card">
+              <div class="donut-svg-wrapper">
+                <svg id="donut-svg" width="210" height="210" viewBox="0 0 210 210">
+                  <!-- Slices populated by JS -->
+                </svg>
+              </div>
+              <div class="donut-legend">
+                <div class="legend-item">
+                  <span class="legend-dot green"></span>
+                  <span>Healthy (No-DR): <strong id="legend-healthy">99.97%</strong></span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot red"></span>
+                  <span>Diabetic Retinopathy (DR): <strong id="legend-dr">0.03%</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Side-by-side comparison cards -->
+            <div class="prob-cards-grid">
+              <div class="prob-card healthy">
+                <div class="prob-card-title">HEALTHY (NO-DR)</div>
+                <div class="prob-card-val" id="card-healthy-val">99.97%</div>
+              </div>
+              <div class="prob-card dr">
+                <div class="prob-card-title">DR DETECTED</div>
+                <div class="prob-card-val" id="card-dr-val">0.03%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Grad-CAM Lesion Heatmap Guide -->
+          <div class="stResultsCol">
+            <h3 class="stSubheader">Grad-CAM Lesion Heatmap Guide</h3>
+            <div class="guide-box">
+              <h4>How to Interpret the Attention Overlay</h4>
+              <ul>
+                <li><strong style="color: #ef4444;">Warm Spectrum (Red / Orange / Yellow):</strong> Highlights key retinal zones where the model detects microaneurysms, hemorrhages, or exudates.</li>
+                <li><strong style="color: #3b82f6;">Cool Spectrum (Blue / Violet):</strong> Indicates healthy background retinal parenchyma and normal tissue regions.</li>
+                <li><strong>Clinical Triage:</strong> Provides explainable visual verification to assist eye care specialists in confirming lesion localization.</li>
+              </ul>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="js/app.js?v=2.0"></script>
 </body>
 </html>

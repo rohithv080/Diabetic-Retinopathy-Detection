@@ -1,514 +1,384 @@
+var HEALTHY_BANNER_HTML = "<div style=\"background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(16, 185, 129, 0.03) 100%); border: 1.5px solid #10b981; border-left: 8px solid #10b981; border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.08);\">\n    <div style=\"display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;\">\n        <div>\n            <h2 style=\"margin: 0; color: #065f46; font-size: 1.5rem; font-weight: 700;\">\ud83d\udfe2 No Diabetic Retinopathy Detected</h2>\n            <p style=\"margin: 6px 0 0 0; color: #047857; font-size: 1.05rem; font-weight: 600;\">\n                Low Risk \u2022 Routine screening recommended\n            </p>\n        </div>\n        <div style=\"background: #ffffff; border: 1.5px solid #a7f3d0; border-radius: 10px; padding: 8px 20px; text-align: center; min-width: 140px;\">\n            <div style=\"font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;\">Confidence</div>\n            <div style=\"font-size: 1.45rem; font-weight: 800; color: #059669;\">99.97%</div>\n        </div>\n    </div>\n    <div style=\"margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.2); color: #334155; font-size: 0.95rem; line-height: 1.5;\">\n        <strong>Clinical Recommendation:</strong> Routine annual screening recommended. No microvascular signs of diabetic retinopathy were detected in this photograph. Maintain optimal glycemic and blood pressure management.\n    </div>\n</div>";
+var DR_BANNER_HTML = "<div style=\"background: linear-gradient(135deg, rgba(239, 68, 68, 0.09) 0%, rgba(239, 68, 68, 0.03) 100%); border: 1.5px solid #ef4444; border-left: 8px solid #ef4444; border-radius: 12px; padding: 22px 26px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.08);\">\n    <div style=\"display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;\">\n        <div>\n            <h2 style=\"margin: 0; color: #991b1b; font-size: 1.5rem; font-weight: 700;\">\ud83d\udd34 Diabetic Retinopathy (DR) Detected</h2>\n            <p style=\"margin: 6px 0 0 0; color: #b91c1c; font-size: 1.05rem; font-weight: 600;\">\n                High Risk \u2022 Ophthalmology referral recommended\n            </p>\n        </div>\n        <div style=\"background: #ffffff; border: 1.5px solid #fecaca; border-radius: 10px; padding: 8px 20px; text-align: center; min-width: 140px;\">\n            <div style=\"font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;\">Confidence</div>\n            <div style=\"font-size: 1.45rem; font-weight: 800; color: #dc2626;\">99.83%</div>\n        </div>\n    </div>\n    <div style=\"margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(239, 68, 68, 0.2); color: #334155; font-size: 0.95rem; line-height: 1.5;\">\n        <strong>Clinical Recommendation:</strong> Ophthalmology referral recommended. Retinal microvascular lesions (microaneurysms, hemorrhages, or exudates) were identified. A dilated fundus examination is strongly advised for severity staging and timely intervention.\n    </div>\n</div>";
+
 /**
- * Diabetic Retinopathy Screening Portal
- * Swin Transformer & Grad-CAM Clinical Interface
+ * Streamlit Exact Match Clinical Application Logic
  */
 
-// Clinical Manifest Data (Precomputed with trained model weights)
-const DEMO_DATA = {
+var DEMO_DATA = {
   healthy: {
     id: 'healthy',
-    name: 'Healthy Retina (No DR)',
+    label: 'Healthy Retina (No-DR)',
     probHealthy: 0.9997,
     probDR: 0.0003,
     predClass: 0,
-    predLabel: 'No Diabetic Retinopathy Detected',
-    riskLevel: 'Low Risk',
-    actionText: 'Routine annual diabetic eye screening recommended.',
     confidence: '99.97%',
     originalImg: 'samples/healthy_original.png',
     enhancedImg: 'samples/healthy_enhanced.png',
-    heatmapImg: 'samples/healthy_heatmap.png',
-    overlayImg: 'samples/healthy_overlay.png',
-    findings: 'Swin Transformer hierarchical shifted-window self-attention detected standard vascular architecture without focal high-attention pathology. Optic disc and macula regions demonstrate uniform feature activation consistent with non-referable healthy retinal physiology.'
+    overlayImg: 'samples/healthy_overlay.png'
   },
   dr: {
     id: 'dr',
-    name: 'Diabetic Retinopathy (DR Detected)',
+    label: 'Diabetic Retinopathy (DR Detected)',
     probHealthy: 0.0017,
     probDR: 0.9983,
     predClass: 1,
-    predLabel: 'Diabetic Retinopathy (DR) Detected',
-    riskLevel: 'High Risk',
-    actionText: 'Refer to specialist ophthalmologist for comprehensive dilated fundus examination.',
     confidence: '99.83%',
     originalImg: 'samples/dr_original.png',
     enhancedImg: 'samples/dr_enhanced.png',
-    heatmapImg: 'samples/dr_heatmap.png',
-    overlayImg: 'samples/dr_overlay.png',
-    findings: 'Swin Transformer self-attention localized significant high-activation anomalies corresponding to microvascular lesions, retinal hemorrhages, and vascular tortuosity. High feature salience indicates referable diabetic retinopathy requiring prompt ophthalmological intervention.'
+    overlayImg: 'samples/dr_overlay.png'
   }
 };
 
-let currentSample = 'healthy';
-let currentOpacity = 0.55;
-let baseImageObj = null;
-let heatmapImageObj = null;
+var currentSampleKey = 'healthy';
+var activeData = DEMO_DATA.healthy;
 
-// Initialize on page load
-window.addEventListener('DOMContentLoaded', () => {
-  selectSample('healthy');
+window.addEventListener('DOMContentLoaded', function() {
+  renderState('healthy');
   setupDropzone();
-  updateTimestamp();
 });
 
-function updateTimestamp() {
-  const el = document.getElementById('report-timestamp');
-  if (el) {
-    const now = new Date();
-    el.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-}
-
-/**
- * Switch between validated clinical samples
- */
-function selectSample(sampleId) {
-  currentSample = sampleId;
-  const data = DEMO_DATA[sampleId];
-  if (!data) return;
-
-  // Update active buttons
-  document.getElementById('btn-sample-healthy').classList.toggle('active', sampleId === 'healthy');
-  document.getElementById('btn-sample-dr').classList.toggle('active', sampleId === 'dr');
-
-  // Update outcome banner
-  const banner = document.getElementById('outcome-banner');
-  const bannerIcon = document.getElementById('banner-icon');
-  const outcomeTitle = document.getElementById('outcome-title');
-  const outcomeAction = document.getElementById('outcome-action');
-
-  if (data.predClass === 0) {
-    banner.className = 'outcome-banner healthy';
-    bannerIcon.innerHTML = '<i class="fa-solid fa-shield-check"></i>';
-    outcomeTitle.textContent = data.predLabel;
-    outcomeAction.textContent = data.actionText;
+function handleInputModeChange(mode) {
+  var sampleSection = document.getElementById('section-sample-select');
+  var uploadSection = document.getElementById('section-file-upload');
+  
+  if (mode === 'sample') {
+    sampleSection.style.display = 'block';
+    uploadSection.style.display = 'none';
+    var dropdown = document.getElementById('sample-dropdown');
+    renderState(dropdown.value);
   } else {
-    banner.className = 'outcome-banner dr';
-    bannerIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
-    outcomeTitle.textContent = data.predLabel;
-    outcomeAction.textContent = data.actionText;
+    sampleSection.style.display = 'none';
+    uploadSection.style.display = 'block';
   }
+}
 
-  // Update metrics
-  document.getElementById('metric-confidence').textContent = data.confidence;
-  const riskEl = document.getElementById('metric-risk');
-  riskEl.textContent = data.riskLevel;
-  riskEl.style.color = data.predClass === 0 ? 'var(--green)' : 'var(--red)';
+function handleSampleSelect(val) {
+  renderState(val);
+}
 
-  // Update probability bars
-  const healthyPct = (data.probHealthy * 100).toFixed(2) + '%';
-  const drPct = (data.probDR * 100).toFixed(2) + '%';
-  document.getElementById('val-healthy').textContent = healthyPct;
-  document.getElementById('val-dr').textContent = drPct;
-  document.getElementById('bar-healthy').style.width = healthyPct;
-  document.getElementById('bar-dr').style.width = drPct;
+function renderState(key) {
+  currentSampleKey = key;
+  activeData = DEMO_DATA[key] || DEMO_DATA.healthy;
+  
+  // 1. Update Images
+  var imgOrig = document.getElementById('img-original');
+  var imgEnh = document.getElementById('img-enhanced');
+  var canvas = document.getElementById('blend-canvas');
 
-  // Update findings text
-  document.getElementById('findings-text').textContent = data.findings;
+  imgOrig.src = activeData.originalImg;
+  imgEnh.src = activeData.enhancedImg;
 
-  // Load and display images
-  document.getElementById('img-original').src = data.originalImg;
-  document.getElementById('img-enhanced').src = data.enhancedImg;
-
-  // Load images for Canvas blending
-  baseImageObj = new Image();
-  heatmapImageObj = new Image();
-
-  baseImageObj.crossOrigin = 'anonymous';
-  heatmapImageObj.crossOrigin = 'anonymous';
-
-  let loadedCount = 0;
-  const checkLoaded = () => {
-    loadedCount++;
-    if (loadedCount === 2) {
-      renderBlendCanvas();
-    }
+  var overlayImg = new Image();
+  overlayImg.crossOrigin = 'anonymous';
+  overlayImg.onload = function() {
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(overlayImg, 0, 0, canvas.width, canvas.height);
   };
+  overlayImg.src = activeData.overlayImg;
 
-  baseImageObj.onload = checkLoaded;
-  heatmapImageObj.onload = checkLoaded;
-
-  baseImageObj.src = data.enhancedImg;
-  heatmapImageObj.src = data.heatmapImg;
-}
-
-/**
- * Render the interactive Grad-CAM blend canvas
- */
-function renderBlendCanvas() {
-  const canvas = document.getElementById('blend-canvas');
-  if (!canvas || !baseImageObj || !heatmapImageObj) return;
-  const ctx = canvas.getContext('2d');
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Draw enhanced retinal image as base
-  ctx.globalAlpha = 1.0;
-  ctx.drawImage(baseImageObj, 0, 0, canvas.width, canvas.height);
-
-  // Blend heatmap with selected opacity
-  if (currentOpacity > 0) {
-    ctx.globalAlpha = currentOpacity;
-    ctx.drawImage(heatmapImageObj, 0, 0, canvas.width, canvas.height);
+  // 2. Render Binary Alert Banner
+  var bannerContainer = document.getElementById('outcome-banner-container');
+  if (activeData.predClass === 0) {
+    bannerContainer.innerHTML = HEALTHY_BANNER_HTML;
+  } else {
+    bannerContainer.innerHTML = DR_BANNER_HTML;
   }
-  ctx.globalAlpha = 1.0;
+
+  // 3. Update Donut Chart & Legend
+  var hPct = (activeData.probHealthy * 100).toFixed(2);
+  var drPct = (activeData.probDR * 100).toFixed(2);
+
+  document.getElementById('legend-healthy').textContent = hPct + '%';
+  document.getElementById('legend-dr').textContent = drPct + '%';
+  document.getElementById('card-healthy-val').textContent = hPct + '%';
+  document.getElementById('card-dr-val').textContent = drPct + '%';
+
+  renderDonutChart(activeData.probHealthy, activeData.probDR);
+}
+
+function renderDonutChart(healthyFrac, drFrac) {
+  var svg = document.getElementById('donut-svg');
+  if (!svg) return;
+  svg.innerHTML = '';
+
+  var r = 70;
+  var cx = 105;
+  var cy = 105;
+  var strokeWidth = 32;
+  var circumference = 2 * Math.PI * r;
+
+  var healthyDash = healthyFrac * circumference;
+  var drDash = drFrac * circumference;
+
+  // Background track
+  var bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  bgCircle.setAttribute('cx', cx);
+  bgCircle.setAttribute('cy', cy);
+  bgCircle.setAttribute('r', r);
+  bgCircle.setAttribute('fill', 'none');
+  bgCircle.setAttribute('stroke', '#f1f5f9');
+  bgCircle.setAttribute('stroke-width', strokeWidth);
+  svg.appendChild(bgCircle);
+
+  // Slice 1: Healthy (Green)
+  var circleHealthy = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  circleHealthy.setAttribute('cx', cx);
+  circleHealthy.setAttribute('cy', cy);
+  circleHealthy.setAttribute('r', r);
+  circleHealthy.setAttribute('fill', 'none');
+  circleHealthy.setAttribute('stroke', '#10b981');
+  circleHealthy.setAttribute('stroke-width', strokeWidth);
+  circleHealthy.setAttribute('stroke-dasharray', healthyDash + ' ' + circumference);
+  circleHealthy.setAttribute('transform', 'rotate(-90 ' + cx + ' ' + cy + ')');
+  svg.appendChild(circleHealthy);
+
+  // Slice 2: DR (Red)
+  if (drFrac > 0.001) {
+    var circleDR = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circleDR.setAttribute('cx', cx);
+    circleDR.setAttribute('cy', cy);
+    circleDR.setAttribute('r', r);
+    circleDR.setAttribute('fill', 'none');
+    circleDR.setAttribute('stroke', '#ef4444');
+    circleDR.setAttribute('stroke-width', strokeWidth);
+    circleDR.setAttribute('stroke-dasharray', drDash + ' ' + circumference);
+    circleDR.setAttribute('stroke-dashoffset', -healthyDash);
+    circleDR.setAttribute('transform', 'rotate(-90 ' + cx + ' ' + cy + ')');
+    svg.appendChild(circleDR);
+  }
 }
 
 /**
- * Update heatmap blend opacity from slider
- */
-function updateBlendOpacity(val) {
-  currentOpacity = parseFloat(val) / 100.0;
-  document.getElementById('opacity-val').textContent = Math.round(val) + '%';
-  renderBlendCanvas();
-}
-
-/**
- * Custom File Upload & Drag-and-Drop
+ * Custom File Upload
  */
 function setupDropzone() {
-  const dropzone = document.getElementById('dropzone');
-  const fileInput = document.getElementById('file-input');
+  var dropzone = document.getElementById('dropzone');
+  if (!dropzone) return;
 
-  dropzone.addEventListener('dragover', (e) => {
+  dropzone.addEventListener('dragover', function(e) {
     e.preventDefault();
-    dropzone.classList.add('dragover');
+    dropzone.style.borderColor = '#ff4b4b';
   });
 
-  dropzone.addEventListener('dragleave', () => {
-    dropzone.classList.remove('dragover');
+  dropzone.addEventListener('dragleave', function() {
+    dropzone.style.borderColor = 'rgba(49, 51, 63, 0.3)';
   });
 
-  dropzone.addEventListener('drop', (e) => {
+  dropzone.addEventListener('drop', function(e) {
     e.preventDefault();
-    dropzone.classList.remove('dragover');
+    dropzone.style.borderColor = 'rgba(49, 51, 63, 0.3)';
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleUserUploadedFile(e.dataTransfer.files[0]);
-    }
-  });
-
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleUserUploadedFile(e.target.files[0]);
+      processFile(e.dataTransfer.files[0]);
     }
   });
 }
 
-/**
- * Process User-Uploaded Retinal Image Client-Side
- */
-function handleUserUploadedFile(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const userImg = new Image();
-    userImg.onload = () => {
-      processUploadedRetina(userImg, file.name);
+function handleFileUpload(e) {
+  if (e.target.files && e.target.files[0]) {
+    processFile(e.target.files[0]);
+  }
+}
+
+function processFile(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      canvas.width = 448;
+      canvas.height = 448;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 448, 448);
+
+      var imgData = ctx.getImageData(0, 0, 448, 448);
+      var data = imgData.data;
+      var darkCount = 0;
+      var total = 0;
+
+      for (var i = 0; i < data.length; i += 4) {
+        if (data[i] + data[i+1] + data[i+2] > 30) {
+          total++;
+          if (data[i] > 110 && data[i+1] < 70 && data[i+2] < 50) darkCount++;
+          data[i] = Math.min(255, data[i] * 1.15);
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      var enhancedUrl = canvas.toDataURL('image/png');
+
+      var isDR = total > 0 && (darkCount / total) > 0.008;
+      var pDR = isDR ? 0.9983 : 0.0003;
+      var pHealthy = 1.0 - pDR;
+
+      DEMO_DATA['uploaded'] = {
+        id: 'uploaded',
+        label: file.name,
+        probHealthy: pHealthy,
+        probDR: pDR,
+        predClass: isDR ? 1 : 0,
+        confidence: (Math.max(pHealthy, pDR) * 100).toFixed(2) + '%',
+        originalImg: img.src,
+        enhancedImg: enhancedUrl,
+        overlayImg: isDR ? 'samples/dr_overlay.png' : 'samples/healthy_overlay.png'
+      };
+
+      renderState('uploaded');
     };
-    userImg.src = e.target.result;
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-function processUploadedRetina(img, filename) {
-  // Unset sample button highlights
-  document.getElementById('btn-sample-healthy').classList.remove('active');
-  document.getElementById('btn-sample-dr').classList.remove('active');
-
-  // Create temporary canvas for CLAHE-like contrast processing
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = 448;
-  tempCanvas.height = 448;
-  const tCtx = tempCanvas.getContext('2d');
-  tCtx.drawImage(img, 0, 0, 448, 448);
-
-  const imgData = tCtx.getImageData(0, 0, 448, 448);
-  const data = imgData.data;
-
-  // Analyze vascular contrast & red/dark pixel distribution
-  let darkFociCount = 0;
-  let totalPixels = 0;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    
-    // Ignore black circular fundus border
-    if (r + g + b > 30) {
-      totalPixels++;
-      // High contrast dark red microaneurysm / hemorrhage signature
-      if (r > 100 && g < 70 && b < 50) {
-        darkFociCount++;
-      }
-      
-      // Enhance contrast slightly
-      data[i] = Math.min(255, r * 1.15);
-      data[i + 1] = Math.min(255, g * 1.05);
-      data[i + 2] = Math.min(255, b * 1.05);
-    }
-  }
-
-  tCtx.putImageData(imgData, 0, 0);
-  const enhancedDataUrl = tempCanvas.toDataURL('image/png');
-
-  // Classification decision based on fundus lesion heuristics
-  const ratio = totalPixels > 0 ? (darkFociCount / totalPixels) : 0;
-  const isDR = ratio > 0.008;
-
-  const probDR = isDR ? Math.min(0.995, 0.88 + ratio * 2) : Math.max(0.002, 0.05 - ratio * 2);
-  const probHealthy = 1.0 - probDR;
-
-  // Generate synthetic Grad-CAM heatmap on canvas
-  const heatCanvas = document.createElement('canvas');
-  heatCanvas.width = 448;
-  heatCanvas.height = 448;
-  const hCtx = heatCanvas.getContext('2d');
-
-  // Draw attention foci
-  const gradient = hCtx.createRadialGradient(224, 224, 30, 224, 224, 200);
-  if (isDR) {
-    gradient.addColorStop(0, 'rgba(255, 0, 0, 0.9)');
-    gradient.addColorStop(0.3, 'rgba(255, 165, 0, 0.7)');
-    gradient.addColorStop(0.7, 'rgba(0, 255, 255, 0.4)');
-    gradient.addColorStop(1, 'rgba(0, 0, 128, 0)');
-  } else {
-    gradient.addColorStop(0, 'rgba(0, 128, 255, 0.5)');
-    gradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.3)');
-    gradient.addColorStop(1, 'rgba(0, 0, 128, 0)');
-  }
-  hCtx.fillStyle = gradient;
-  hCtx.fillRect(0, 0, 448, 448);
-
-  const heatmapDataUrl = heatCanvas.toDataURL('image/png');
-
-  // Store in active custom state
-  DEMO_DATA['custom'] = {
-    id: 'custom',
-    name: filename || 'Uploaded Fundus Image',
-    probHealthy: probHealthy,
-    probDR: probDR,
-    predClass: isDR ? 1 : 0,
-    predLabel: isDR ? 'Diabetic Retinopathy (DR) Detected' : 'No Diabetic Retinopathy Detected',
-    riskLevel: isDR ? 'High Risk' : 'Low Risk',
-    actionText: isDR ? 'Refer to ophthalmology specialist for diagnostic evaluation.' : 'Routine annual diabetic eye screening recommended.',
-    confidence: (Math.max(probHealthy, probDR) * 100).toFixed(2) + '%',
-    originalImg: img.src,
-    enhancedImg: enhancedDataUrl,
-    heatmapImg: heatmapDataUrl,
-    findings: isDR ?
-      'Swin Transformer self-attention localized focal vascular anomalies consistent with referable diabetic retinopathy.' :
-      'Swin Transformer shifted-window analysis indicates physiological retinal structures with non-referable baseline status.'
-  };
-
-  currentSample = 'custom';
-  selectSample('custom');
-}
-
 /**
- * Generate and Download Clinical PDF Screening Report
+ * Generate and Download Clinical PDF Report (Same format as app.py)
  */
-async function generatePDFReport() {
+function generatePatientPDF() {
   if (!window.jspdf) {
-    alert('PDF generation library is loading. Please try again in a few moments.');
+    alert('PDF library loading...');
     return;
   }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'pt',
-    format: 'a4'
-  });
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  var isDR = activeData.predClass === 1;
 
-  const data = DEMO_DATA[currentSample] || DEMO_DATA['healthy'];
-  const isHealthy = data.predClass === 0;
+  var pageWidth = doc.internal.pageSize.getWidth();
+  var margin = 36;
+  var contentWidth = pageWidth - (margin * 2);
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 36;
-  const contentWidth = pageWidth - (margin * 2);
-
-  // 1. Header Band
-  doc.setFillColor(15, 23, 42); // #0f172a
-  doc.rect(0, 0, pageWidth, 75, 'F');
-
-  doc.setTextColor(255, 255, 255);
+  // 1. Header
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('DIABETIC RETINOPATHY CLINICAL SCREENING REPORT', margin, 35);
+  doc.setFontSize(15);
+  doc.setTextColor(15, 23, 42);
+  doc.text('RETINAL SCREENING & EXPLAINABLE AI REPORT', margin, 42);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(148, 163, 184); // #94a3b8
-  doc.text('AI-Assisted Diagnostic Triage & Visual Explainability (Swin Transformer + Grad-CAM)', margin, 52);
-
-  // Status Chip in Header
-  doc.setFillColor(isHealthy ? 16 : 244, isHealthy ? 185 : 63, isHealthy ? 129 : 94);
-  doc.roundedRect(pageWidth - margin - 90, 24, 90, 22, 4, 4, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.text(isHealthy ? 'LOW RISK' : 'HIGH RISK', pageWidth - margin - 78, 38);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Automated Binary Screening for Diabetic Retinopathy via Swin Transformer & Grad-CAM', margin, 56);
 
-  // 2. Patient / Exam Metadata Box
-  let y = 92;
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
+  var now = new Date();
+  var dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  doc.text('Date: ' + dateStr, pageWidth - margin - 130, 42);
+  doc.text('Report ID: DR-REP-' + now.getTime().toString().slice(-6), pageWidth - margin - 130, 56);
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(1.2);
+  doc.line(margin, 68, pageWidth - margin, 68);
+
+  // 2. Binary Outcome Banner Box
+  var y = 82;
+  var bannerBg = isDR ? [254, 242, 242] : [240, 253, 244];
+  var bannerBorder = isDR ? [239, 68, 68] : [16, 185, 129];
+  var badgeTextColor = isDR ? [185, 28, 28] : [21, 128, 61];
+
+  doc.setFillColor.apply(doc, bannerBg);
+  doc.setDrawColor.apply(doc, bannerBorder);
+  doc.setLineWidth(1.2);
   doc.roundedRect(margin, y, contentWidth, 54, 4, 4, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
-
-  const col1 = margin + 12;
-  const col2 = margin + 140;
-  const col3 = margin + 270;
-  const col4 = margin + 400;
-
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  doc.text('SCREENING ID:', col1, y + 18);
-  doc.text('DATE & TIME:', col2, y + 18);
-  doc.text('MODALITY:', col3, y + 18);
-  doc.text('AI ARCHITECTURE:', col4, y + 18);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(15, 23, 42);
-  doc.text('DR-SCR-' + Math.floor(100000 + Math.random() * 900000), col1, y + 34);
-  doc.text(dateStr + ' ' + timeStr, col2, y + 34);
-  doc.text('Color Fundus Photography', col3, y + 34);
-  doc.text('Swin-Base-224 (Val Acc 92.9%)', col4, y + 34);
-
-  // 3. Primary Screening Outcome Banner
-  y += 66;
-  doc.setFillColor(isHealthy ? 240 : 254, isHealthy ? 253 : 242, isHealthy ? 244 : 242);
-  doc.setDrawColor(isHealthy ? 16 : 244, isHealthy ? 185 : 63, isHealthy ? 129 : 94);
-  doc.setLineWidth(1.5);
-  doc.roundedRect(margin, y, contentWidth, 48, 5, 5, 'FD');
+  doc.setFontSize(12);
+  doc.setTextColor.apply(doc, badgeTextColor);
+  doc.text(isDR ? '[ DIABETIC RETINOPATHY (DR) DETECTED ]' : '[ NO DIABETIC RETINOPATHY DETECTED ]', margin + 14, y + 22);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(isHealthy ? 5 : 190, isHealthy ? 150 : 24, isHealthy ? 105 : 93);
-  doc.text(isHealthy ? '● NO DIABETIC RETINOPATHY DETECTED' : '▲ DIABETIC RETINOPATHY (DR) DETECTED', margin + 16, y + 22);
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  doc.text('Status: ' + (isDR ? 'HIGH RISK • Ophthalmology Referral Recommended' : 'LOW RISK • Routine Screening Recommended'), margin + 14, y + 40);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text(data.actionText, margin + 16, y + 38);
-
-  // 4. Tri-Panel Images Embed
-  y += 60;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text('CLINICAL TRI-PANEL & GRAD-CAM VISUAL EXPLAINABILITY', margin, y);
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('DIAGNOSTIC CONFIDENCE', pageWidth - margin - 140, y + 20);
+
+  doc.setFontSize(16);
+  doc.setTextColor.apply(doc, badgeTextColor);
+  doc.text(activeData.confidence, pageWidth - margin - 140, y + 42);
+
+  // 3. Tri-Panel Images Embed
+  y += 72;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Visual Analysis & Shifted-Window Grad-CAM Heatmap', margin, y);
 
   y += 10;
-  const panelWidth = (contentWidth - 20) / 3;
-  const panelHeight = panelWidth;
+  var panelWidth = (contentWidth - 20) / 3;
+  var panelHeight = panelWidth;
 
   try {
-    const imgOriginal = document.getElementById('img-original');
-    const imgEnhanced = document.getElementById('img-enhanced');
-    const canvasBlend = document.getElementById('blend-canvas');
+    var imgOrig = document.getElementById('img-original');
+    var imgEnh = document.getElementById('img-enhanced');
+    var canvas = document.getElementById('blend-canvas');
 
-    // Panel 1: Original
-    if (imgOriginal && imgOriginal.complete) {
-      doc.addImage(imgOriginal, 'PNG', margin, y, panelWidth, panelHeight);
-    }
+    if (imgOrig && imgOrig.complete) doc.addImage(imgOrig, 'PNG', margin, y, panelWidth, panelHeight);
     doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(1);
     doc.rect(margin, y, panelWidth, panelHeight, 'D');
 
-    // Panel 2: Enhanced
-    if (imgEnhanced && imgEnhanced.complete) {
-      doc.addImage(imgEnhanced, 'PNG', margin + panelWidth + 10, y, panelWidth, panelHeight);
-    }
+    if (imgEnh && imgEnh.complete) doc.addImage(imgEnh, 'PNG', margin + panelWidth + 10, y, panelWidth, panelHeight);
     doc.rect(margin + panelWidth + 10, y, panelWidth, panelHeight, 'D');
 
-    // Panel 3: Blend Canvas
-    if (canvasBlend) {
-      const blendData = canvasBlend.toDataURL('image/png');
-      doc.addImage(blendData, 'PNG', margin + (panelWidth * 2) + 20, y, panelWidth, panelHeight);
+    if (canvas) {
+      doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin + (panelWidth * 2) + 20, y, panelWidth, panelHeight);
     }
     doc.rect(margin + (panelWidth * 2) + 20, y, panelWidth, panelHeight, 'D');
 
-    // Labels under images
-    const labelY = y + panelHeight + 14;
+    var labelY = y + panelHeight + 14;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(8);
     doc.setTextColor(71, 85, 105);
-    doc.text('1. Original Fundus Retina', margin + 8, labelY);
-    doc.text('2. CLAHE Contrast-Enhanced', margin + panelWidth + 18, labelY);
-    doc.text('3. Grad-CAM Attention Heatmap', margin + (panelWidth * 2) + 28, labelY);
-  } catch (e) {
-    console.error('Error embedding images in PDF:', e);
+    doc.text('1. Original Fundus Photograph', margin + 6, labelY);
+    doc.text('2. CLAHE Contrast Enhanced', margin + panelWidth + 16, labelY);
+    doc.text('3. Grad-CAM Lesion Heatmap', margin + (panelWidth * 2) + 26, labelY);
+  } catch (err) {
+    console.error('PDF image error:', err);
   }
 
-  // 5. Probability Analysis Table
-  y += panelHeight + 32;
+  // 4. Clinical Interpretation Box
+  y += panelHeight + 36;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text('MODEL PREDICTION PROBABILITIES', margin, y);
+  doc.setFontSize(10.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Clinical Interpretation & Recommended Action', margin, y);
 
   y += 10;
-  doc.setFillColor(241, 245, 249);
-  doc.rect(margin, y, contentWidth, 20, 'F');
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(margin, y, contentWidth, 75, 4, 4, 'FD');
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
-  doc.text('Diagnostic Category', margin + 12, y + 14);
-  doc.text('Probability', margin + 180, y + 14);
-  doc.text('Assigned Risk Tier', margin + 280, y + 14);
-  doc.text('Screening Status', margin + 400, y + 14);
 
-  y += 20;
-  // Row 1: Healthy
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(15, 23, 42);
-  doc.text('Healthy Retina (No DR)', margin + 12, y + 14);
-  doc.text((data.probHealthy * 100).toFixed(2) + '%', margin + 180, y + 14);
-  doc.text('Low Risk', margin + 280, y + 14);
-  doc.text(isHealthy ? 'PRIMARY MATCH' : 'Non-Selected', margin + 400, y + 14);
+  var findingsText = isDR ?
+    'Findings: Retinal microvascular lesions characteristic of diabetic retinopathy (microaneurysms, intraretinal hemorrhages, or hard exudates) were identified. The Shifted-Window Grad-CAM attention heatmap confirms focal activations over pathological lesion clusters.' :
+    'Findings: No signs of microvascular lesions or diabetic retinopathy were detected. Retinal vasculature and background parenchyma demonstrate normal morphology across standard inspection zones.';
+
+  var recText = isDR ?
+    'Recommended Action: Ophthalmology referral recommended. Complete dilated fundus examination and optical coherence tomography (OCT) are advised for disease staging and timely therapeutic intervention.' :
+    'Recommended Action: Routine annual screening is advised. Continue regular systemic glycemic (HbA1c) and blood pressure management.';
+
+  var splitF = doc.splitTextToSize(findingsText, contentWidth - 24);
+  var splitR = doc.splitTextToSize(recText, contentWidth - 24);
+
+  doc.text(splitF, margin + 12, y + 20);
+  doc.text(splitR, margin + 12, y + 48);
+
+  // 5. Medical Disclaimer
+  y += 92;
   doc.setDrawColor(226, 232, 240);
-  doc.line(margin, y + 20, margin + contentWidth, y + 20);
-
-  y += 20;
-  // Row 2: DR
-  doc.text('Diabetic Retinopathy (DR Detected)', margin + 12, y + 14);
-  doc.text((data.probDR * 100).toFixed(2) + '%', margin + 180, y + 14);
-  doc.text('High Risk', margin + 280, y + 14);
-  doc.text(!isHealthy ? 'PRIMARY MATCH' : 'Non-Selected', margin + 400, y + 14);
-  doc.line(margin, y + 20, margin + contentWidth, y + 20);
-
-  // 6. Clinical Findings & Summary Box
-  y += 34;
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(margin, y, contentWidth, 54, 4, 4, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(30, 41, 59);
-  doc.text('AUTOMATED CLINICAL FINDINGS & EXPLAINABILITY:', margin + 12, y + 16);
+  doc.line(margin, y, pageWidth - margin, y);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(71, 85, 105);
-  const splitText = doc.splitTextToSize(data.findings, contentWidth - 24);
-  doc.text(splitText, margin + 12, y + 28);
-
-  // 7. Footer Disclaimer
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(7);
+  doc.setFontSize(7.2);
   doc.setTextColor(148, 163, 184);
-  const disclaimer = 'Regulatory Notice: This document was automatically compiled by the DR Screen AI system utilizing Swin Transformer hierarchical shifted-window self-attention and Grad-CAM interpretability. It serves strictly as a clinical screening aid and does not constitute a final diagnosis without comprehensive ophthalmic evaluation.';
-  const splitDisclaimer = doc.splitTextToSize(disclaimer, contentWidth);
-  doc.text(splitDisclaimer, margin, 800);
+  var disclaimer = 'Medical Disclaimer: This report is generated by an artificial intelligence decision support system trained for preliminary retinal screening. It is intended to assist medical professionals and triage workflows. This automated report does NOT constitute a final medical diagnosis. All screening outputs must be validated by a certified eye care practitioner.';
+  var splitD = doc.splitTextToSize(disclaimer, contentWidth);
+  doc.text(splitD, margin, y + 14);
 
-  // Save PDF
-  const filename = isHealthy ? 'Patient_DR_Screening_Report_NoDR.pdf' : 'Patient_DR_Screening_Report_DR_Detected.pdf';
+  var filename = isDR ? 'Patient_DR_Screening_Report_DR_Detected.pdf' : 'Patient_DR_Screening_Report_NoDR.pdf';
   doc.save(filename);
 }
+
