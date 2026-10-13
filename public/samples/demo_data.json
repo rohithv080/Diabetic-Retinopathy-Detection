@@ -1,0 +1,28 @@
+{
+  "healthy": {
+    "name": "Healthy Retina (No DR)",
+    "prob_healthy": 0.9997221827507019,
+    "prob_dr": 0.0002778041234705597,
+    "pred_class": 0,
+    "pred_label": "Healthy Retina (No DR)",
+    "risk_level": "Low",
+    "confidence": 0.9997221827507019,
+    "original_img": "samples/healthy_original.png",
+    "enhanced_img": "samples/healthy_enhanced.png",
+    "heatmap_img": "samples/healthy_heatmap.png",
+    "overlay_img": "samples/healthy_overlay.png"
+  },
+  "dr": {
+    "name": "Diabetic Retinopathy (DR Detected)",
+    "prob_healthy": 0.0017303571803495288,
+    "prob_dr": 0.9982696771621704,
+    "pred_class": 1,
+    "pred_label": "Diabetic Retinopathy (DR Detected)",
+    "risk_level": "High",
+    "confidence": 0.9982696771621704,
+    "original_img": "samples/dr_original.png",
+    "enhanced_img": "samples/dr_enhanced.png",
+    "heatmap_img": "samples/dr_heatmap.png",
+    "overlay_img": "samples/dr_overlay.png"
+  }
+}
