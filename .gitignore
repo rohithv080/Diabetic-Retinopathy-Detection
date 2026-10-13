@@ -28,3 +28,10 @@ Thumbs.db
 # Documents & raw notes
 *.docx
 extracted.txt
+
+# Temporary outputs and exports
+static/*.pdf
+static/*.txt
+reports/
+extracted_images/
+
